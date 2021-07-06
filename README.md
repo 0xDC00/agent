@@ -4,7 +4,7 @@ Text hooker with javascript.
 ## Project Architecture
 - The program (GUI) injects javascript and runtime into the target process.
 - The script will "hook" to the correspond memory address to get the text in-game
-then sent them to the translator (eg: translation aggregator, chiitrans, ...)
+then sent them to the translator (eg: translation aggregator, chiitrans, textractor,...)
 - That alls.
 
 ## Features
