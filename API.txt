@@ -1,0 +1,157 @@
+------------------------------------------------------------------------------
+Frida API
+------------------------------------------------------------------------------
+NativePointer
+  .readCString([size = -1]) : string
+  .readAnsiString([size = -1]) : string
+  .readUtf8String([size = -1]) : string
+  .readUtf16String([size = -1]) : string
+  .writeUtf8String(str) : void
+  .writeUtf16String(str) : void
+  .writeAnsiString(str) : void
+  .readByteArray(lenght) : ArrayBuffer
+  .writeByteArray(bytes_arrayBuffer) : void
+  .readPointer()
+  .writePointer(ptr)
+  .readS8(), readU8(), readS16(), readU16(), readS32(), readU32(),
+      readShort(), readUShort(), readInt(), readUInt(), readFloat(), readDouble(),
+      readS64(), readU64(), readLong(), readULong()
+  . writeS8(value), writeU8(value), writeS16(value), writeU16(value), writeS32(value),
+      writeU32(value), writeShort(value), writeUShort(value), writeInt(value), writeUInt(value), writeFloat(value), writeDouble(value)
+      writeS64(value), writeU64(value), writeLong(value), writeULong(value)
+
+Memory
+  .readByteArray(ptr, sz) : ArrayBuffer
+  .allocUtf8String(str) : NativePointer
+  .allocUtf16String(str) : NativePointer
+  .allocAnsiString(str) : NativePointer  
+  .dup(address, size): short-hand for Memory.alloc(size) followed by Memory.copy(dst, src, n)
+  .protect(ptr('0x1234'), 4096, 'rw-');
+  .scan(address, size, pattern, callbacks)
+  .scanSync(address, size, pattern)
+
+ArrayBuffer
+  .unwrap() : NativePointer
+  .wrap(ptr) : ArrayBuffer
+
+Process
+  .findModuleByAddress(address) | .getModuleByAddress(address) : Module
+  .findModuleByName(name) | .getModuleByName(name)
+
+Module
+  .findExportByName(exportName) | .getExportByName(exportName) : NativePointer
+         Module.findExportByName(moduleName|null, exportName)
+         Module.getExportByName(moduleName|null, exportName)
+  .load(path) : Module
+
+NativeFunction
+  new NativeFunction(address, returnType, argTypes[, abi]) : function
+  new NativeFunction(address, returnType, argTypes[, options]) : function
+        https://frida.re/docs/javascript-api/#nativefunction
+
+NativeCallback
+	https://frida.re/news/2017/08/15/frida-10-4-released/
+
+Interceptor
+  .attach(target, callbacks[, data])
+  .detachAll()
+  .replace(target, replacement[, data])
+  .revert(target)
+  .flush()
+
+CModule
+  https://frida.re/news/2019/09/18/frida-12-7-released/
+  https://github.com/frida/frida-gum/tree/master/bindings/gumjs/runtime/cmodule
+  https://frida.re/docs/javascript-api/#nativecallback
+
+...https://frida.re/docs/javascript-api/
+------------------------------------------------------------------------------
+Agent
+------------------------------------------------------------------------------
+__libname
+__dirname
+__filename
+
+require(path_to_js_file)
+
+md5(arrayBuffer) : string
+md5(NativePointer, size) : string
+atob(str)
+btoa(str)
+
+Process
+    .cwd()
+    .execPath()
+
+NativePointer
+  .readShiftJisString([size=-1]) : string
+  .writeShiftJisString(str) : void
+
+Memory
+  .allocShiftJisString(str) : NativePointer
+
+hwbp (hardware breakpoint)
+  .remove(address, threadId)
+  .add(address, contition, size, threadId)
+    address: any
+    condition:
+      - a: access
+      - w: write
+      - x: execute
+    size: 1, 2, 4, 8
+    threadId: any (-1 = allThread)
+
+
+File (or https://frida.re/docs/javascript-api/#file)
+  .ReadAllText(path) : string                  | file.readText
+  .WriteAllText(path, contents) : void         | file.writeText
+  .ReadAllBytes(path) : ArrayBuffer            | file.readBytes
+  .WriteAllBytess(path, ArrayBuffer) : void    | file.writeBytes
+
+Path
+  .GetFullPath(path, [basePath=NULL]) : string | path.resolve
+  .GetDirectoryName(path)                      | path.dirname
+  .GetFileName(path)                           | path.basename
+  .GetFileNameWithoutExtension(path)           | path.onlyname
+  .GetExtension(path)                          | path.extname
+  .ChangeExtension(path,ext)                   | path.extset
+  .Combine(paths...)                           | path.join
+  .GetRelativePath(from, to) : string          | path.relative
+  .IsPathRooted(s)                             | path.isAbsolute
+
+request
+  .getSync(url, options) : response
+  .get(url, options, cb) : void
+  .get(url, options) : Promise | then(response)
+  .postSync(url, options) : response
+  .post(url, options, cb) : void
+  .post(url, options) : Promise | then(response)
+
+   request.get('https://www.google.com/', {
+      header: {
+          'origin': '',
+          'user-agent': '',
+          key: value
+      },
+      params: { key: value }
+      cookies: { key: value }
+     
+   }).then((ret) => {
+         console.log(JSON.stringify(a));
+   })
+
+   
+   payload: { 'key': 'value' }    form post
+   body: str                      json post
+
+
+   response
+     .status_code
+     .error {
+         .code
+         .message
+      }
+     .elapsed
+     .cookies
+     .url
+     .text
