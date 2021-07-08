@@ -92,13 +92,14 @@ Memory
 
 hwbp (hardware breakpoint)
   .remove(address, threadId)
-  .add(address, contition, size, threadId)
+  .add(address, contition, size, callbacks, threadId)
     address: any
     condition:
       - a: access
       - w: write
       - x: execute
     size: 1, 2, 4, 8
+    callbacks: a callback like OnEnter of Intercepter.attach
     threadId: any (-1 = allThread)
 
 
