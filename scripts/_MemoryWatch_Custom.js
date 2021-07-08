@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Memory Watchpoint (shift_jis)
+// @name         Memory Watchpoint (encoding)
 // @version      0.1
 // @author       [DC]
 // @description  Any target, static pointer
@@ -7,10 +7,12 @@
 //   and send the results when there are any changes.
 //   * Warning:
 //     - You must give a valid address. (the script will ask on load; use any memory scanner (eg: cheat engine) to find it.)
-//     - This script use shift_jis for decode, if you need another encoding, go with _MemoryWatch_Custom.js
+//     - You must set a valid encoding. (line 14)
 // ==/UserScript==
 (function () {
     console.log('Script loaded!');
+    const decoder = new TextDecoder('utf-32le'); // <-- set your encoding here (utf-8, utf-16le, utf-32le, shift_jis, ...)
+    
     run();
 
     function run() {
@@ -39,10 +41,10 @@
         //console.log('read_text');
         Memory.scan(address, 4096, '00 00 00 00', {
             onMatch: function (found, size) {
-                const len = found.sub(address).toInt32();
+                const len = align(found.sub(address).toInt32(), 4);
                 if (len > 0) {
-                    //console.log(len, address.readByteArray(len));
-                    const str = address.readShiftJisString(len)
+                    const buf = address.readByteArray(len);
+                    const str = decoder.decode(buf)
                         .replace(/\u0000/g, '\n')  // terminated -> \n
                         .replace(/\n{2,}/g, '\n')  // single \n
                         .replace(/\n+$/, '')       // remove trailing \n
@@ -54,5 +56,10 @@
             },
             onComplete: function () {}
         });
+    }
+    
+    function align(value, alignment)
+    {
+        return (value + (alignment - 1)) & ~(alignment - 1);
     }
 })();
