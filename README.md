@@ -14,8 +14,8 @@ then sent them to the translator (eg: translation aggregator, chiitrans, textrac
 ### Folder Structure
 ```
 Agent.exe              <-- GUI
-📂scripts              <-- user scripts
-📂bin
++scripts               <-- user scripts
+-bin
  └agent-32.bin         <-- runtime
  └agent-64.bin
  └agent-helper-32.bin  <-- injector
@@ -25,9 +25,9 @@ Agent.exe              <-- GUI
 
 Notes:
 - Log channel:
-  + log_console:  use console log (attach console to the target)
   + log_nothing:  disable log.
-  + log_console_: No given file, use debug tab of the GUI. (OutputDebugString)
+  + log_console:  attach console to the target.
+  + log_console_: or no file given, use debug tab of the GUI. (OutputDebugString)
 
 Change to another channel if it matches the target log.
 ```

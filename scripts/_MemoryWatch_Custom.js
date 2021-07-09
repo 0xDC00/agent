@@ -2,21 +2,22 @@
 // @name         Memory Watchpoint (encoding)
 // @version      0.1
 // @author       [DC]
-// @description  Any target, static pointer
+// @description  
 //   This script will observe at an assigned address,
 //   and send the results when there are any changes.
+//   This way may work for many titles (PC, Emulator: ppsspp, yuzu,...) but not all.
 //   * Warning:
-//     - You must give a valid address. (the script will ask on load; use any memory scanner (eg: cheat engine) to find it.)
-//     - You must set a valid encoding. (line 14)
+//     - You must set a valid encoding. (line 16)
+//     - You must give a valid address. (I will ask on load; use any memory scanner (eg: cheat engine) to find it.)
+//          *** Make sure you get the corrected address for each of new sentence when the dialog was changed.
 // ==/UserScript==
 (function () {
     console.log('Script loaded!');
     const decoder = new TextDecoder('utf-32le'); // <-- set your encoding here (utf-8, utf-16le, utf-32le, shift_jis, ...)
-    
     run();
 
     function run() {
-        var str_address = prompt('address?');
+        var str_address = prompt('Make sure you get the corrected address for each of new sentence when the dialog was changed.\n\nAddress?');
         if (!str_address) return;
 
         var address = parseInt(str_address.trim());
