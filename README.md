@@ -41,12 +41,10 @@ Latest: <https://github.com/0xDC00/agent/archive/refs/heads/master.zip>
 - Press Attach button.
 
 ## Showcase & Tutorials
-- Hardware Breakpoint Hook | Watchpoints\
+- Hardware Breakpoint Hook | ExecutionWatch (PC, Emulator: PPSSPP, Vita3k, Yuzu, ...)\
+  [![Tantei Bokumetsu](https://img.youtube.com/vi/bFuD9Fb1zKM/1.jpg)](https://youtu.be/bFuD9Fb1zKM?list=PLTZXVVG9AT6TATy_7ey3jUkE0g35t3xtk)
+- Hardware Breakpoint Hook | MemoryWatch (PC, Emulator: PPSSPP, Vita3k, Yuzu, ...)\
   [![Kamigami no Asobi InFinite](https://img.youtube.com/vi/kwy_TggjTB4/1.jpg)](https://youtu.be/kwy_TggjTB4?list=PLTZXVVG9AT6TATy_7ey3jUkE0g35t3xtk)
-- Inline Hook\
-  [![TAISHO x ALICE Episode 1](https://img.youtube.com/vi/Ey4Fa3TSEzE/1.jpg)](https://youtu.be/Ey4Fa3TSEzE?list=PLTZXVVG9AT6TATy_7ey3jUkE0g35t3xtk)
-- Inline Hook | PPSSPP - Just-In-Time (JIT) Compiler Hook\
-  [![Kamigami no Asobi InFinite](https://img.youtube.com/vi/dTMCsOQR7R4/1.jpg)](https://youtu.be/dTMCsOQR7R4)
 
 ## Credits
 - [Gum](https://github.com/frida/frida-gum)

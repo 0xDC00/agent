@@ -2,7 +2,7 @@
 // @name         TAISHO x ALICE Episode 1
 // @version      0.1
 // @author       [DC]
-// @description  Inline hook
+// @description  Inline hook (lang=JP)
 // ==/UserScript==
 (function() {
     console.log('Script loaded!');
