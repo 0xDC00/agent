@@ -27,7 +27,7 @@
                     const buf = address.readByteArray(len);
                     console.log('buf', buf);
                     
-                    // decode and apply filter
+                    // decode and apply filter (TODO: let translator handle it?)
                     const str = decoder.decode(buf)
                         /* filter1: controls -> \n */
                         .replace(/[\u0000-\u001F\u007F-\u009F\xFFFD]/g, '\n')
@@ -71,14 +71,14 @@
             if (terminated) terminated_pattern = terminated;
             terminated_pattern = terminated_pattern.replace(/\s/g, ''); // all whitespace, not just the literal space
             
-            globalThis.text_padding = terminated_pattern.length / 2; // byteCount
+            globalThis.text_padding = terminated_pattern.length / 2;    // default: byteCount
             
             mem_watch(ptr(address));
         }
     }
 
     function mem_watch(address) {
-        var debounce = null;
+        var debounce = null; // run after last execute
         console.log('mem_watch: ', address);
 
         // set breakpoint on write (w) at address, size=1, all threads (-1).
@@ -88,6 +88,7 @@
         } /*onEnter*/, -1 /*threadId*/);
 
         if (!bp) console.log('[Error] HWBP.add');
+        else console.log(`HWBP at ${address} set!`);
     }
     
     function getEncodingName(s) {

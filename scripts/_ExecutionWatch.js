@@ -3,10 +3,11 @@
 // @version      0.1
 // @author       [DC]
 // @description  
-//    This script use pattern search for hooking.
+//    This script use pattern search for hooking (like H-Code but dynamic).
 //    This way may work for almost titles (PC, Emulator: ppsspp, yuzu,...).
 //   * Warning:
-//       TODO: wiki
+//       How to create D-CODE: https://github.com/0xDC00/agent/wiki/Finding-D-CODE
+//       D-CODE database: https://docs.google.com/spreadsheets/d/14k5TBc2cAed8Fcx2fb5schlPh6Ah24dmW3dJpxvNAbc/
 // ==/UserScript==
 (function () {
     console.log('Script loaded! isDebuggerAttached: ', Process.isDebuggerAttached());
@@ -26,7 +27,7 @@
                     const buf = address.readByteArray(len);
                     console.log('buf', buf);
                     
-                    // decode and apply filter
+                    // decode and apply filter (TODO: let translator handle it?)
                     const str = decoder.decode(buf)
                         /* filter1: controls -> \n */
                         .replace(/[\u0000-\u001F\u007F-\u009F\xFFFD]/g, '\n')
@@ -81,7 +82,7 @@
                 if (terminated) terminated_pattern = terminated;
                 terminated_pattern = terminated_pattern.replace(/\s/g, ''); // all whitespace, not just the literal space
                 
-                globalThis.text_padding = terminated_pattern.length / 2;    // byteCount
+                globalThis.text_padding = terminated_pattern.length / 2;    // default: byteCount
                 
                 exec_watch(ptr(address));
             }
@@ -89,7 +90,7 @@
     }
     
     function execDCode(dcode) { // $encoding,?padding_1248|terminaterPattern,?offset|?expressions|movHookPattern
-        var splited = dcode.substr(1).split(',');
+        const splited = dcode.substr(1).split(',');
         const pattern = splited[splited.length-1];                     // ?offset|?expressions|movHookPattern
         const encoding = splited[0];                                   // encoding
         globalThis.terminated_pattern = splited[1].replace(/\s/g, ''); // ?padding_1248|terminaterPattern
@@ -110,7 +111,7 @@
     }
     
     function hookByPattern(pattern) { // ?offset|?expressions|movHookPattern
-        var offset = 0, expressions, mod;
+        var offset = 0, expressions, moduleName;
 
         var splited = pattern.split('|');
         if (splited.length > 1) {
@@ -124,23 +125,23 @@
             }
         }
         
-        // parse pattern
-        if (pattern.startsWith('0x')) { /*VA*/
+        // parse block
+        if (pattern.startsWith('0x')) { /* VA */
             exec_watch(ptr(pattern), expressions);
             return;
         }
-        else if ((splited = pattern.split('$:')).length > 1) { /*mod$:RVA <=> $:112233 (exe), .dll$:332211*/
-            if (splited[0]) mod = splited[0]; 
+        else if ((splited = pattern.split('$:')).length > 1 ) { /* x64dbg style (mod$:RVA): $:1122FF (exe), .dll$:1122FF */
+            if (splited[0]) moduleName = splited[0]; 
             
-            var base = mod ? Process.getModuleByName(mod).base : Process.enumerateModules()[0].base;
+            const base = moduleName ? Process.getModuleByName(moduleName).base : Process.enumerateModules()[0].base;
             exec_watch(base.add('0x'+splited[1]), expressions);
             return;
         }
         else {
             if ((splited = pattern.split('$')).length > 1) { /*mod$pattern*/
-                mod = splited[0];
+                moduleName = splited[0];
                 pattern = splited[1];
-                var range = mod ? Process.getModuleByName(mod) : Process.enumerateModules()[0];
+                const range = moduleName ? Process.getModuleByName(moduleName) : Process.enumerateModules()[0];
                 const results = Memory.scanSync(range.base, range.size, pattern);
                 if (results.length > 0) {
                     const address = results[0].address;
@@ -169,9 +170,10 @@
     }
     
     function exec_watch(insAddress, expressions) {
-        var debounce = null; // after last execute
+        var debounce = null; // run after last execute
         const getMemoryAddress = expressions ? genGetMemoryAddressFromExpressions(expressions) : genGetMemoryAddress(insAddress);
         
+        // set breakpoint on excute (x) at insAddress, all threads (-1).
         const bp = hwbp.add(insAddress, 'x', 1, function () {
             console.log('onEnter');
             if (textAddress === null) {
@@ -184,10 +186,14 @@
         }, -1); // KnowIssue: live reload = random crash (Interceptor.attach work but freeze when reload)
         
         if (!bp) console.log('[Error] HWBP.add');
+        else console.log(`HWBP at ${insAddress} set!`);
     }
     
     function genGetMemoryAddressFromExpressions(expressions) {
-        var body = 'return ' + getExpressionsParser().parse(expressions) + ';';
+        /*
+        ex: [esp+4]+8
+        */
+        const body = 'return ' + getExpressionsParser().parse(expressions) + ';';
         return new Function('ctx', body);
     }
     
@@ -326,14 +332,14 @@
 
         function negate(value) {
             //return -value;
-            return `NULL.sub(${value})`;
+            return isNaN(value) ? `NULL.sub(ctx.${value})` : `NULL.sub(${value})`;
         }
 
         function parseOp(r) {
-            if(r.string.substr(r.offset,2) == '**') {
-                r.offset += 2;
-                return ops['**'];
-            }
+            // if(r.string.substr(r.offset,2) == '**') {
+            //     r.offset += 2;
+            //     return ops['**'];
+            // }
             if("+-*/".indexOf(r.string.substr(r.offset,1)) >= 0)
                 return ops[r.string.substr(r.offset++, 1)];
             return null;
