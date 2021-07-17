@@ -21,15 +21,7 @@ Agent.exe               <-- GUI
  ├─agent-helper-32.bin  <-- injector
  ├─agent-helper-64.bin
  ├─init.js              <-- global script
- └─log_console_         <-- log channel, based on file name.
-
-Notes:
-- Log channel:
-  + log_nothing:  disable log.
-  + log_console:  attach console to the target.
-  + log_console_: or no file given, use debug tab of the GUI. (OutputDebugString)
-
-Change to another channel if it matches the target log.
+ └─log_console          <-- log channel, based on file name.
 ```
 
 ## Download
