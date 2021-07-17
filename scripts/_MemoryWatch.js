@@ -46,7 +46,7 @@
                 
                 return 'stop';
             },
-            onComplete: function () { textAddress = null; }
+            onComplete: function () { /*textAddress = null;*/ }
         });
     }
     
@@ -55,6 +55,8 @@
     }
     
     function _main_() {
+        globalThis.readDelay = 750;
+        //globalThis.textAddress = null;
         var str_address = prompt('Make sure you get the corrected address for each of new sentence when the dialog was changed.\n\nAddress?');
         if (!str_address) return;
         
@@ -84,7 +86,7 @@
         // set breakpoint on write (w) at address, size=1, all threads (-1).
         const bp = hwbp.add(address, 'w', 1, function () {
             clearTimeout(debounce);
-            debounce = setTimeout(read_text, 750, address);
+            debounce = setTimeout(read_text, readDelay, address);
         } /*onEnter*/, -1 /*threadId*/);
 
         if (!bp) console.log('[Error] HWBP.add');

@@ -55,6 +55,7 @@
     }
     
     function _main_() {
+        globalThis.readDelay = 750;
         globalThis.textAddress = null;
         if (_FIXED_DCODE_) {
             execDCode(_FIXED_DCODE_);
@@ -100,6 +101,10 @@
         if (termSplited.length > 1) {
             terminated_pattern = termSplited[termSplited.length-1]; // last
             globalThis.text_padding = parseInt(termSplited[0]); // first
+            
+            if (termSplited.length > 2) {
+                readDelay = parseInt(termSplited[1]);
+            }
         }
         else {
             globalThis.text_padding = terminated_pattern.length / 2;
@@ -182,7 +187,7 @@
                 textAddress = getMemoryAddress(this.context);
             }
             clearTimeout(debounce);
-            debounce = setTimeout(read_text, 750, textAddress);
+            debounce = setTimeout(read_text, readDelay, textAddress);
         }, -1); // KnowIssue: live reload = random crash (Interceptor.attach work but freeze when reload)
         
         if (!bp) console.log('[Error] HWBP.add');
