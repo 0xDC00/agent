@@ -11,7 +11,7 @@
 // ==/UserScript==
 (function () {
     console.log('Script loaded! isDebuggerAttached: ', Process.isDebuggerAttached());
-    const _FIXED_DCODE_ = ''; // <-- SPECIFIC GAME SETTING
+    //const _FIXED_DCODE_ = ''; // <-- SPECIFIC GAME SETTING
     
     _main_();
     
@@ -57,7 +57,7 @@
     function _main_() {
         globalThis.readDelay = 750;
         globalThis.textAddress = null;
-        if (_FIXED_DCODE_) {
+        if (typeof _FIXED_DCODE_ !== 'undefined' && _FIXED_DCODE_) {
             execDCode(_FIXED_DCODE_);
             return;
         }
