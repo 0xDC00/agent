@@ -68,9 +68,8 @@
         str_address = str_address.trim();
         if (str_address[0] == '$') {
             execDCode(str_address);
-        }
-        else {
-            // ask user
+        } // TODO: support H-Code
+        else { // ask user
             var address = parseInt(str_address);
             if (!address) _main_();
             else {
@@ -90,24 +89,28 @@
         }
     }
     
-    function execDCode(dcode) { // $encoding,?padding_1248|terminaterPattern,?offset|?expressions|movHookPattern
+    // TODO: support multiple hooks? (max=4) dcode;dcode;...
+    function execDCode(dcode) { // $encoding,?padding_1248|?delay|terminatedPattern,?offset|?expressions|movHookPattern
         const splited = dcode.substr(1).split(',');
-        const pattern = splited[splited.length-1];                     // ?offset|?expressions|movHookPattern
-        const encoding = splited[0];                                   // encoding
-        globalThis.terminated_pattern = splited[1].replace(/\s/g, ''); // ?padding_1248|terminaterPattern
+        const pattern = splited[splited.length-1];                     // Hook: ?offset|?expressions|movHookPattern
+        globalThis.terminated_pattern = splited[1].replace(/\s/g, ''); // Read: ?padding_1248|?delay|terminatedPattern
+        const encoding = splited[0];                                   // Decode: encoding
 
         // try get padding
         var termSplited = terminated_pattern.split('|');
         if (termSplited.length > 1) {
             terminated_pattern = termSplited[termSplited.length-1]; // last
-            globalThis.text_padding = parseInt(termSplited[0]); // first
-            
-            if (termSplited.length > 2) {
+
+            // padding can be empty: |?delay|terminated
+            globalThis.text_padding = termSplited[0] ? parseInt(termSplited[0]) : terminated_pattern.length / 2;
+
+            // delay can be empty:   ||terminated
+            if (termSplited.length > 2 && termSplited[1]) {
                 readDelay = parseInt(termSplited[1]);
             }
         }
         else {
-            globalThis.text_padding = terminated_pattern.length / 2;
+            globalThis.text_padding = terminated_pattern.length / 2; // default: byteCount
         }
         
         globalThis.decoder = new TextDecoder(encoding);
@@ -122,10 +125,13 @@
         if (splited.length > 1) {
             pattern = splited[splited.length-1]; // last
             
-            if(splited[0])
+            // offset can be empty:      |?expressions|movHookPattern
+            if(splited[0]) {
                 offset = parseInt(splited[0]); // first
-            
-            if (splited.length > 2) {
+            }
+
+            // expressions can be empty: ||movHookPattern
+            if (splited.length > 2 && splited[1]) {
                 expressions = splited[1].replace(/\s/g, ''); // second
             }
         }
@@ -195,11 +201,11 @@
     }
     
     function genGetMemoryAddressFromExpressions(expressions) {
-        /*
-        ex: [esp+4]+8
-        */
+        // ex: [esp+4]+8
         const body = 'return ' + getExpressionsParser().parse(expressions) + ';';
-        return new Function('ctx', body);
+        const fn = new Function('ctx', body);
+        console.log('getMemoryAddress: ', fn);
+        return fn;
     }
     
     function genGetMemoryAddress(address) {
