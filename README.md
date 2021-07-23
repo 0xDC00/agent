@@ -39,6 +39,11 @@ Latest: <https://github.com/0xDC00/agent/archive/refs/heads/master.zip>
 - MemoryWatch\
   [![Kamigami no Asobi InFinite](https://img.youtube.com/vi/kwy_TggjTB4/1.jpg)](https://youtu.be/kwy_TggjTB4?list=PLTZXVVG9AT6TATy_7ey3jUkE0g35t3xtk)
 
+## Community
+If you have contributions, need support, have suggestions,\
+or just want to get in touch with the team, join our [Discord server](https://discord.gg/vR28jEhXnM)!
+
+
 ## Credits
 - [Gum](https://github.com/frida/frida-gum)
 - [AvalonEdit](https://github.com/icsharpcode/AvalonEdit)
