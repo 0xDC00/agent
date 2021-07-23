@@ -41,7 +41,7 @@ Latest: <https://github.com/0xDC00/agent/archive/refs/heads/master.zip>
 
 ## Community
 If you have contributions, need support, have suggestions,\
-or just want to get in touch with the team, join our [Discord server](https://discord.gg/vR28jEhXnM)!
+or just want to get in touch with the team, join our [Discord server](https://discord.gg/cdmSkXR7j8)!
 
 
 ## Credits
