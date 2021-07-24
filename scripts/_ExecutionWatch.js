@@ -35,7 +35,7 @@
 
     function read_text(info) {
         const address = info.address;
-        console.log('read_text', hexdump(address, { header: false }));
+        console.log(hexdump(address, { header: false }));
 
         // detect block size with terminated_pattern
         Memory.scan(address, 4096, info.terminated, {
@@ -43,7 +43,7 @@
                 const len = align(found.sub(address).toInt32(), info.padding);
                 if (len > 0) {
                     const buf = address.readByteArray(len);
-                    console.log('buf', hexdump(buf, { header: false }));
+                    console.log('buf\n', hexdump(buf, { header: false }));
 
                     const str = filters_text(info.decoder.decode(buf));
 
@@ -76,7 +76,7 @@
                 return globalThis.decode.call(this, buffer);
             };
         }
-        if (typeof _FIXED_DCODE_ === 'string' || _FIXED_DCODE_ instanceof String) {
+        if (typeof _FIXED_DCODE_ === 'string' || (typeof _FIXED_DCODE_ !== 'undefined' && _FIXED_DCODE_ instanceof String)) {
             const codes = _FIXED_DCODE_.split(';'); // multiple hooks (max=4): dcode;dcode;...
             var count = 0;
             for (const code of codes) {
