@@ -10,15 +10,32 @@
 //       D-CODE database: https://docs.google.com/spreadsheets/d/14k5TBc2cAed8Fcx2fb5schlPh6Ah24dmW3dJpxvNAbc/
 // ==/UserScript==
 (function () {
-    console.log('Script loaded! isDebuggerAttached:', Process.isDebuggerAttached());
+    console.log('Script loaded!');
     //const _FIXED_DCODE_ = ''; // <-- SPECIFIC GAME SETTING
+
+    while (Process.isDebuggerAttached()) prompt('Please exit the debugger!');
 
     _main_();
 
     // String block may contain controls code, that will need a custom parser.
+    function filters_text(s) {
+        return s
+            /* filter1: controls -> \n */
+            .replace(/[\u0000-\u001F\u007F-\u009F\xFFFD]/g, '\n')
+            /* filter2: remove line that do not contain any JP char */
+            .replace(/^(?!.*[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf\u2605-\u2606\u2190-\u2195\u203B]+.*).+$/mg, '')
+            /* filter3: single \n */
+            .replace(/\n{2,}/g, '\n')
+            /* filter4: remove trailing \n */
+            .replace(/\n+$/, '')
+            /* filter5: single line */
+            //.replace(/\n+/, ' ')
+            ;
+    }
+
     function read_text(info) {
         const address = info.address;
-        console.log('read_text', hexdump(address));
+        console.log('read_text', hexdump(address, { header: false }));
 
         // detect block size with terminated_pattern
         Memory.scan(address, 4096, info.terminated, {
@@ -26,23 +43,10 @@
                 const len = align(found.sub(address).toInt32(), info.padding);
                 if (len > 0) {
                     const buf = address.readByteArray(len);
-                    console.log('buf', buf);
+                    console.log('buf', hexdump(buf, { header: false }));
 
-                    // decode and apply filter (TODO: let translator handle it?; allow overwride?)
-                    const str = info.decoder.decode(buf)
-                        /* filter1: controls -> \n */
-                        .replace(/[\u0000-\u001F\u007F-\u009F\xFFFD]/g, '\n')
-                        /* filter2: remove line that do not contain any JP char */
-                        .replace(/^(?!.*[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf\u2605-\u2606\u2190-\u2195\u203B]+.*).+$/mg, '')
-                        /* filter3: single \n */
-                        .replace(/\n{2,}/g, '\n')
-                        /* filter4: remove trailing \n */
-                        .replace(/\n+$/, '')
-                        /* filter5: single line */
-                        //.replace(/\n+/, ' ')
-                        ;
+                    const str = filters_text(info.decoder.decode(buf));
 
-                    //console.log('----------------\n'+str);
                     trans.send(str); // send to translation aggregator
                 }
 
@@ -59,144 +63,169 @@
     function _main_() {
         globalThis.readDelay = 750;
         globalThis.isLeading = false;
-        if (typeof _FIXED_DCODE_ !== 'undefined' && _FIXED_DCODE_) {
-            execDCode(_FIXED_DCODE_);
+
+        if (typeof globalThis.filters === 'function') {
+            globalThis._filters = filters_text;
+            filters_text = filters;
+        }
+        if (typeof globalThis.decode === 'function') {
+            const __decode = TextDecoder.prototype.decode;
+            var thiz; globalThis._decode = function (buffer) { return __decode.call(thiz, buffer); }
+            TextDecoder.prototype.decode = function (buffer) {
+                thiz = this;
+                return globalThis.decode.call(this, buffer);
+            };
+        }
+        if (typeof _FIXED_DCODE_ === 'string' || _FIXED_DCODE_ instanceof String) {
+            const codes = _FIXED_DCODE_.split(';'); // multiple hooks (max=4): dcode;dcode;...
+            var count = 0;
+            for (const code of codes) {
+                if (code[0] == '$') {
+                    if (execDCode(code) && ++count == 4) break;
+                }
+            }
             return;
         }
 
-        var str_address = prompt('Address (0x..?)\nor\nD-CODE ($..?)'); // 256 chars limit, TODO: rewrite prompt
-        if (!str_address) return;
+        var input = prompt('Address (0x..?)\nor\nD-CODE ($..?)'); // 256 chars limit, TODO: rewrite prompt
+        if (!input) return;
 
-        str_address = str_address.trim();
-        if (str_address[0] == '$') {
-            execDCode(str_address);
+        input = input.trim();
+        if (input[0] == '$') {
+            if (!execDCode(input)) return _main_();
         } // TODO: support H-Code
         else { // ask user
-            var address = parseInt(str_address);
-            if (!address) _main_();
+            if (!parseInt(input)) _main_();
             else {
                 var encoding = prompt('Encoding?\n1. utf-8\n2. utf-16le\n3. utf-32le\n4. shift_jis', 'utf-8');
                 encoding = getEncodingName(encoding);
-                globalThis.decoder = new TextDecoder(encoding);
 
-                globalThis.terminated_pattern = encoding.toUpperCase().startsWith('UTF-32') ? '00 00 00 0?' : '00 0?';
+                var terminated_pattern = encoding.toUpperCase().startsWith('UTF-32') ? '00 00 00 0?' : '00 0?';
                 var terminated = prompt('terminated pattern?\n- 00\n- 00 0?\n- 00 00 00 0?', terminated_pattern);
                 if (terminated) terminated_pattern = terminated;
                 terminated_pattern = terminated_pattern.replace(/\s/g, ''); // all whitespace, not just the literal space
 
-                globalThis.text_padding = terminated_pattern.length / 2;    // default: byteCount
-
-                exec_watch(ptr(address));
+                var dcode = '$' + encoding + ',' + terminated_pattern + ',' + input;
+                execDCode(dcode);
             }
         }
     }
 
-    // TODO: refactor, support multiple hooks? (max=4) dcode;dcode;...
-    function execDCode(dcode) { // $encoding,?padding_1248|?delay|?isLeading|terminatedPattern,?offset|?expressions|movHookPattern
-        const splited = dcode.substr(1).split(',');
-        const pattern = splited[splited.length - 1];                     // Hook: ?offset|?expressions|movHookPattern
-        globalThis.terminated_pattern = splited[1].replace(/\s/g, ''); // Read: ?padding_1248|?delay|?isLeading|terminatedPattern
-        const encoding = splited[0];                                   // Decode: encoding
+    function execDCode(sdcode) {
+        console.log('Load: ' + sdcode);
+        const dcode = {
+            readDelay: readDelay,
+            isLeading: isLeading
+        };
+        var splited = sdcode.substr(1).split(','); // Dcode,Read,Hook
 
-        // try get padding
-        var termSplited = terminated_pattern.split('|');
+        /* parse Decode: encoding */
+        dcode.decoder = new TextDecoder(splited[0]);
+
+        /* parse Read: ?padding_1248|?delay|?isLeading|terminatedPattern */
+        dcode.terminated = splited[1].replace(/\s/g, '');
+        var termSplited = dcode.terminated.split('|');
         if (termSplited.length > 1) {
-            terminated_pattern = termSplited[termSplited.length - 1]; // last
+            dcode.terminated = termSplited[termSplited.length - 1]; // last
 
             // padding can be empty: |?delay|terminated
-            globalThis.text_padding = termSplited[0] ? parseInt(termSplited[0]) : terminated_pattern.length / 2;
+            dcode.padding = termSplited[0] ? parseInt(termSplited[0]) : dcode.terminated.length / 2;
 
             // delay can be empty:   ||terminated
             if (termSplited.length > 2) {
-                if (termSplited[1]) readDelay = parseInt(termSplited[1]);
+                if (termSplited[1]) dcode.readDelay = parseInt(termSplited[1]);
 
-                isLeading = termSplited[2] === '1';
+                dcode.isLeading = termSplited[2] === '1';
             }
         }
         else {
-            globalThis.text_padding = terminated_pattern.length / 2; // default: byteCount
+            dcode.padding = dcode.terminated.length / 2; // default: byteCount
         }
 
-        globalThis.decoder = new TextDecoder(encoding);
-
-        hookByPattern(pattern);
-    }
-
-    function hookByPattern(pattern) { // ?offset|?expressions|movHookPattern
-        var offset = 0, expressions, moduleName;
-
-        var splited = pattern.split('|');
+        /* parse Hook: ?offset|?expressions|movHookPattern */
+        splited = splited[splited.length - 1].split('|');
         if (splited.length > 1) {
-            pattern = splited[splited.length - 1]; // last
-
             // offset can be empty:      |?expressions|movHookPattern
-            if (splited[0]) {
-                offset = parseInt(splited[0]);
-            }
+            if (splited[0]) dcode.offset = parseInt(splited[0]);
 
             // expressions can be empty: ||movHookPattern
-            if (splited.length > 2 && splited[1]) {
-                expressions = splited[1].replace(/\s/g, '');
-            }
+            if (splited[1]) dcode.expressions = splited[1].replace(/\s/g, '');
         }
+        else dcode.offset = 0;
+        dcode.pattern = splited[splited.length - 1];
 
-        // parse block
+        return hookByPattern(dcode);
+    }
+
+    function hookByPattern(dcode) {
+        var pattern = dcode.pattern, splited;
+
+        /* find hook address */
         if (pattern.startsWith('0x')) { /* VA */
-            exec_watch(ptr(pattern), expressions);
-            return;
+            dcode.address = ptr(pattern);
+            return exec_watch(dcode);
         }
         else if ((splited = pattern.split('$:')).length > 1) { /* x64dbg style (mod$:RVA): $:1122FF (exe), .dll$:1122FF */
-            if (splited[0]) moduleName = splited[0];
-
-            const base = moduleName ? Process.getModuleByName(moduleName).base : Process.enumerateModules()[0].base;
-            exec_watch(base.add('0x' + splited[1]), expressions);
-            return;
+            const base = splited[0] ? Process.getModuleByName(splited[0]).base : Process.enumerateModules()[0].base;
+            dcode.address = base.add('0x' + splited[1]);
+            return exec_watch(dcode);
+        }
+        else if ((splited = pattern.split(':')).length > 1) { /* x64dbg style: mod:export */
+            const mod = splited[0] ? Process.getModuleByName(splited[0]) : Process.enumerateModules()[0];
+            dcode.address = mod.findExportByName(splited[1]);
+            if (dcode.address) return exec_watch(dcode);
+            return false;
         }
         else {
+            var ranges = [];
             if ((splited = pattern.split('$')).length > 1) { /*mod$pattern*/
-                moduleName = splited[0];
                 pattern = splited[1];
-                const range = moduleName ? Process.getModuleByName(moduleName) : Process.enumerateModules()[0];
+                const range = splited[0] ? Process.getModuleByName(splited[0]) : Process.enumerateModules()[0];
+                ranges.push(range);
+            }
+            else { /* emulator jit: rwx (yuzu) */
+                ranges = Process.enumerateRanges({ protection: 'r-x', coalesce: true });
+            }
+
+            console.log('Pattern:', pattern);
+            for (const range of ranges) {
                 const results = Memory.scanSync(range.base, range.size, pattern);
                 if (results.length > 0) {
                     const address = results[0].address;
+                    dcode.address = address.add(dcode.offset);
                     console.log('[Pattern] found:', address);
-                    exec_watch(address.add(offset), expressions);
-                    return;
-                }
-            }
-            else { // emulator jit: rwx (yuzu)
-                console.log('Pattern:', pattern); /*pattern*/
-                const ranges = Process.enumerateRanges({ protection: 'r-x', coalesce: true });
-                for (const range of ranges) {
-                    const results = Memory.scanSync(range.base, range.size, pattern);
-                    if (results.length > 0) {
-                        const address = results[0].address;
-                        console.log('[Pattern] found:', address);
-                        exec_watch(address.add(offset), expressions);
-                        return;
-                    }
+                    return exec_watch(dcode);
                 }
             }
 
             console.log('[Pattern] no result!');
-            _main_();
+            return false;
         }
     }
 
     // debounce trailing (run after last execute): https://miro.medium.com/max/1400/1*-r8hP_iDBPrj-odjIZajzw.gif
-    function createDebounceCallback(func, timeout, getMemoryAddress) {
+    function createDebounceCallback(func, info, getMemoryAddress) {
+        const timeout = info.readDelay;
         var timer = null;
-        const info = {
-            address: null,
-            buffer: null,
-            terminated: terminated_pattern,
-            padding: text_padding,
-            decoder: decoder,
-        };
+        info.address = null;
+        info.buffer = null;
 
-        if (timeout == 0) {
-            // runSync when noDelay
+        if (info.isLeading) { // debounce leading
+            return function () {
+                if (!timer) {
+                    console.log('onEnter', getMemoryAddress(this.context));
+                    info.address = getMemoryAddress(this.context);
+                    info.buffer = info.address.readByteArray(4096);
+                    info.address = info.buffer.unwrap();
+                    func.call(this, info);
+                }
+
+                clearTimeout(timer);
+                timer = setTimeout(function () { timer = undefined; console.log('done'); }, timeout);
+            };
+        }
+
+        if (timeout == 0) { // runSync when noDelay
             return function () {
                 console.log('onEnter', getMemoryAddress(this.context));
                 info.address = getMemoryAddress(this.context);
@@ -219,45 +248,18 @@
         };
     }
 
-    // debounce leading
-    function createDebounceLeadingCallback(func, timeout, getMemoryAddress) {
-        var timer = null;
-        const info = {
-            address: null,
-            buffer: null,
-            terminated: terminated_pattern,
-            padding: text_padding,
-            decoder: decoder,
-        };
-
-        return function () {
-            if (!timer) {
-                console.log('onEnter', getMemoryAddress(this.context));
-                info.address = getMemoryAddress(this.context);
-                info.buffer = info.address.readByteArray(4096);
-                info.address = info.buffer.unwrap();
-                func.call(this, info);
-            }
-
-            clearTimeout(timer);
-            timer = setTimeout(function () { timer = undefined; console.log('done'); }, timeout);
-        };
-    }
-
-    function exec_watch(insAddress, expressions) {
+    function exec_watch(dcode) {
+        const insAddress = dcode.address;
         console.log('exec_watch:', insAddress, '\nInstruction:', Instruction.parse(insAddress).toString());
-        const getMemoryAddress = expressions ? genGetMemoryAddressFromExpressions(expressions) : genGetMemoryAddress(insAddress);
-        const func = isLeading ? createDebounceLeadingCallback : createDebounceCallback;
-        var callback = func(read_text, readDelay, getMemoryAddress);
-
+        const getMemoryAddress = dcode.expressions ? genGetMemoryAddressFromExpressions(dcode.expressions) : genGetMemoryAddress(insAddress);
+        const callback = createDebounceCallback(read_text, dcode, getMemoryAddress);
         console.log('getMemoryAddress: ', getMemoryAddress);
 
         // set breakpoint on excute (x) at insAddress, all threads (-1).
-        // KnowIssue: live reload = random crash (Interceptor.attach work but freeze when reload)
+        // KnowIssue: live reload, re-set hwbp = random crash (Interceptor.attach work but freeze when reload)
         const bp = hwbp.add(insAddress, 'x', 1, callback, -1);
-
-        if (!bp) console.log('[Error] HWBP.add');
-        else console.log(`HWBP at ${insAddress} set!`);
+        console.log(bp ? `HWBP at ${insAddress} set!` : '[Error] HWBP.add');
+        return bp ? true : false;
     }
 
     function genGetMemoryAddressFromExpressions(expressions) {
@@ -286,22 +288,13 @@
         */
         var body = `var base = ctx.${op.base};`;
         if (op.index) {
-            if (op.scale > 1) {
-                body += `var index = ctx.${op.index} * ${op.scale};`;
-                body += 'base = base.add(index);';
-            }
-            else {
-                body += `base = base.add(ctx.${op.index});`;
-            }
+            if (op.scale > 1) body += `base = base.add(ctx.${op.index} * ${op.scale});`;
+            else body += `base = base.add(ctx.${op.index});`;
         }
         else {
-            if (op.scale > 1) {
-                body += `base = ptr(base * ${op.scale});`;
-            }
+            if (op.scale > 1) body += `base = ptr(base * ${op.scale});`;
         }
-        if (op.disp) {
-            body += `base = base.add(${op.disp});`;
-        }
+        if (op.disp) body += `base = base.add(${op.disp});`;
         body += 'return base;';
         return new Function('ctx', body);
     }
@@ -319,14 +312,14 @@
     }
 
     function getExpressionsParser() {
-        // operator table (not > xor > and > or > /* > +-)
+        // operator table (* / %, + -, << >>, < <= > >=, == !=, &, ^, |, &&, ||)
         const ops = {
             '+': { op: '+', precedence: 10, assoc: 'L', exec: function (l, r) { return /*l+r*/ `${l}.add(${r})`; } },
             '-': { op: '-', precedence: 10, assoc: 'L', exec: function (l, r) { return /*l-r*/ `${l}.sub(${r})`; } },
             '*': { op: '*', precedence: 20, assoc: 'L', exec: function (l, r) { return /*l*r*/ `$ptr(${l}*${r})`; } },
             '/': { op: '/', precedence: 20, assoc: 'L', exec: function (l, r) { return /*l/r*/ `$ptr(${l}/${r})`; } },
-            '&': { op: '&', precedence: 31, assoc: 'L', exec: function (l, r) { return /*l&r*/ `${l}.and(${r})`; } },
-            '|': { op: '|', precedence: 30, assoc: 'L', exec: function (l, r) { return /*l|r*/ `${l}.or(${r})`; } }
+            '&': { op: '&', precedence: 6, assoc: 'L', exec: function (l, r) { return /*l&r*/ `${l}.and(${r})`; } },
+            '|': { op: '|', precedence: 4, assoc: 'L', exec: function (l, r) { return /*l|r*/ `${l}.or(${r})`; } }
         };
 
         // constants or variables
