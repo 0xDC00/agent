@@ -153,28 +153,24 @@
         }
         else dcode.offset = 0;
         dcode.pattern = splited[splited.length - 1];
+        dcode.address = findHookAddress(dcode);
 
-        return hookByPattern(dcode);
+        return dcode.address ? exec_watch(dcode) : false;
     }
 
-    function hookByPattern(dcode) {
+    function findHookAddress(dcode) {
         var pattern = dcode.pattern, splited;
 
-        /* find hook address */
         if (pattern.startsWith('0x')) { /* VA */
-            dcode.address = ptr(pattern);
-            return exec_watch(dcode);
+            return ptr(pattern);
         }
         else if ((splited = pattern.split('$:')).length > 1) { /* x64dbg style (mod$:RVA): $:1122FF (exe), .dll$:1122FF */
             const base = splited[0] ? Process.getModuleByName(splited[0]).base : Process.enumerateModules()[0].base;
-            dcode.address = base.add('0x' + splited[1]);
-            return exec_watch(dcode);
+            return base.add('0x' + splited[1]);
         }
         else if ((splited = pattern.split(':')).length > 1) { /* x64dbg style: mod:export */
             const mod = splited[0] ? Process.getModuleByName(splited[0]) : Process.enumerateModules()[0];
-            dcode.address = mod.findExportByName(splited[1]);
-            if (dcode.address) return exec_watch(dcode);
-            return false;
+            return mod.findExportByName(splited[1]);
         }
         else {
             var ranges = [];
@@ -192,9 +188,8 @@
                 const results = Memory.scanSync(range.base, range.size, pattern);
                 if (results.length > 0) {
                     const address = results[0].address;
-                    dcode.address = address.add(dcode.offset);
                     console.log('[Pattern] found:', address);
-                    return exec_watch(dcode);
+                    return address.add(dcode.offset);
                 }
             }
 
