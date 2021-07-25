@@ -47,7 +47,7 @@
 
                     const str = filters_text(info.decoder.decode(buf));
 
-                    trans.send(str); // send to translation aggregator
+                    if (str) trans.send(str); // send to translation aggregator
                 }
 
                 return 'stop';
@@ -117,7 +117,7 @@
             readDelay: readDelay,
             isLeading: isLeading
         };
-        var splited = sdcode.substr(1).split(','); // Dcode,Read,Hook
+        var splited = sdcode.substr(1).split(','); // Decode,Read,Hook
 
         /* parse Decode: encoding */
         dcode.decoder = new TextDecoder(splited[0]);
