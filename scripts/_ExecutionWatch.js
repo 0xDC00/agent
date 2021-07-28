@@ -143,6 +143,7 @@
         }
 
         /* parse Hook: ?offset|?expressions|movHookPattern */
+        dcode.offset = 0;
         splited = splited[splited.length - 1].split('|');
         if (splited.length > 1) {
             // offset can be empty:      |?expressions|movHookPattern
@@ -151,10 +152,9 @@
             // expressions can be empty: ||movHookPattern
             if (splited[1]) dcode.expressions = splited[1].replace(/\s/g, '');
         }
-        else dcode.offset = 0;
         dcode.pattern = splited[splited.length - 1];
         dcode.address = findHookAddress(dcode);
-
+        
         return dcode.address ? exec_watch(dcode) : false;
     }
 
@@ -164,7 +164,7 @@
         if (pattern.startsWith('0x')) { /* VA */
             return ptr(pattern);
         }
-        else if ((splited = pattern.split('$:')).length > 1) { /* x64dbg style (mod$:RVA): $:1122FF (exe), .dll$:1122FF */
+        else if ((splited = pattern.split(':$')).length > 1) { /* x64dbg style (mod:$RVA): :$1122FF (exe), .dll:$1122FF */
             const base = splited[0] ? Process.getModuleByName(splited[0]).base : Process.enumerateModules()[0].base;
             return base.add('0x' + splited[1]);
         }
