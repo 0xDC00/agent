@@ -37,23 +37,29 @@
         const address = info.address;
         console.log(hexdump(address, { header: false }));
 
-        // detect block size with terminated_pattern
-        Memory.scan(address, 4096, info.terminated, {
-            onMatch: function (found, size) {
-                const len = align(found.sub(address).toInt32(), info.padding);
-                if (len > 0) {
-                    const buf = address.readByteArray(len);
-                    console.log('buf\n', hexdump(buf, { header: false }));
+        if (!info.terminated) {
+            const buf = address.readByteArray(info.bufferSize);
+            const str = filters_text(info.decoder.decode(buf));
+            if (str) trans.send(str);
+        }
+        else {
+            // detect block size with terminated_pattern
+            Memory.scan(address, info.bufferSize, info.terminated, {
+                onMatch: function (found, size) {
+                    const len = align(found.sub(address).toInt32(), info.padding);
+                    if (len > 0) {
+                        const buf = address.readByteArray(len);
+                        console.log('buf\n', hexdump(buf, { header: false }));
 
-                    const str = filters_text(info.decoder.decode(buf));
+                        const str = filters_text(info.decoder.decode(buf));
+                        if (str) trans.send(str); // send to translation aggregator
+                    }
 
-                    if (str) trans.send(str); // send to translation aggregator
-                }
-
-                return 'stop';
-            },
-            onComplete: function () { info.address = null; }
-        });
+                    return 'stop';
+                },
+                onComplete: function () { info.address = null; }
+            });
+        }
     }
 
     function align(value, alignment) { // 1 2 4 8 16
@@ -123,6 +129,7 @@
         dcode.decoder = new TextDecoder(splited[0]);
 
         /* parse Read: ?padding_1248|?delay|?isLeading|terminatedPattern */
+        dcode.bufferSize = 4096;
         dcode.terminated = splited[1].replace(/\s/g, '');
         var termSplited = dcode.terminated.split('|');
         if (termSplited.length > 1) {
@@ -141,6 +148,11 @@
         else {
             dcode.padding = dcode.terminated.length / 2; // default: byteCount
         }
+        if (dcode.terminated[0] == '*') {
+            const s = dcode.terminated.substr(1);
+            if (s) dcode.bufferSize = parseInt(s);
+            dcode.terminated = undefined;
+        }
 
         /* parse Hook: ?offset|?expressions|movHookPattern */
         dcode.offset = 0;
@@ -154,7 +166,7 @@
         }
         dcode.pattern = splited[splited.length - 1];
         dcode.address = findHookAddress(dcode);
-        
+
         return dcode.address ? exec_watch(dcode) : false;
     }
 
@@ -201,32 +213,33 @@
     // debounce trailing (run after last execute): https://miro.medium.com/max/1400/1*-r8hP_iDBPrj-odjIZajzw.gif
     function createDebounceCallback(func, info, getMemoryAddress) {
         const timeout = info.readDelay;
-        var timer = null;
+        let timer = null;
         info.address = null;
         info.buffer = null;
 
+        function runSync() {
+            info.address = getMemoryAddress(this.context);
+            info.buffer = info.address.readByteArray(info.bufferSize);
+            info.address = info.buffer.unwrap();
+            func.call(this, info);
+        }
+
         if (info.isLeading) { // debounce leading
             return function () {
+                console.log('onEnter', getMemoryAddress(this.context));
                 if (!timer) {
-                    console.log('onEnter', getMemoryAddress(this.context));
-                    info.address = getMemoryAddress(this.context);
-                    info.buffer = info.address.readByteArray(4096);
-                    info.address = info.buffer.unwrap();
-                    func.call(this, info);
+                    runSync.call(this);
                 }
 
                 clearTimeout(timer);
-                timer = setTimeout(function () { timer = undefined; console.log('done'); }, timeout);
+                timer = setTimeout(function () { timer = undefined; console.log('>>>'); }, timeout);
             };
         }
 
         if (timeout == 0) { // runSync when noDelay
             return function () {
                 console.log('onEnter', getMemoryAddress(this.context));
-                info.address = getMemoryAddress(this.context);
-                info.buffer = info.address.readByteArray(4096);
-                info.address = info.buffer.unwrap();
-                func.call(this, info);
+                runSync.call(this);
             };
         }
 
