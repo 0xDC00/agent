@@ -37,22 +37,22 @@
         const address = info.address;
         console.log(hexdump(address, { header: false }));
 
-        if (!info.terminated) {
-            const buf = address.readByteArray(info.bufferSize);
+        if (!info.terminated) { // fixed-size buffers
+            const buf = info.buffer ? info.buffer : address.readByteArray(info.bufferSize);
             const str = filters_text(info.decoder.decode(buf));
             if (str) trans.send(str);
         }
-        else {
-            // detect block size with terminated_pattern
+        else { // detect block size with terminated_pattern
             Memory.scan(address, info.bufferSize, info.terminated, {
                 onMatch: function (found, size) {
                     const len = align(found.sub(address).toInt32(), info.padding);
                     if (len > 0) {
                         const buf = address.readByteArray(len);
-                        console.log('buf\n', hexdump(buf, { header: false }));
-
                         const str = filters_text(info.decoder.decode(buf));
-                        if (str) trans.send(str); // send to translation aggregator
+                        if (str) {
+                            console.log('buf\n', hexdump(buf, { header: false }));
+                            trans.send(str); // send to translation aggregator
+                        }
                     }
 
                     return 'stop';
