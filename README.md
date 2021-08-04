@@ -36,8 +36,6 @@ Latest: <https://github.com/0xDC00/agent/archive/refs/heads/master.zip>
 - Wiki: https://github.com/0xDC00/agent/wiki
 - ExecutionWatch\
   [![Tantei Bokumetsu](https://img.youtube.com/vi/bFuD9Fb1zKM/1.jpg)](https://youtu.be/bFuD9Fb1zKM?list=PLTZXVVG9AT6TATy_7ey3jUkE0g35t3xtk)
-- MemoryWatch\
-  [![Kamigami no Asobi InFinite](https://img.youtube.com/vi/kwy_TggjTB4/1.jpg)](https://youtu.be/kwy_TggjTB4?list=PLTZXVVG9AT6TATy_7ey3jUkE0g35t3xtk)
 
 ## Community
 If you have contributions, need support, have suggestions,\
