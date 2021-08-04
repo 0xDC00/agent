@@ -3,22 +3,19 @@
 // @version      0.1
 // @author       [DC]
 // @description  
-//    This script use pattern search for hooking (like H-Code but dynamic).
-//    This way may work for almost titles (PC, Emulator: ppsspp, yuzu,...).
+//    This script use pattern search for hooking.
+//    This way may work for almost target (PC, Emulator: ppsspp, yuzu,...).
 //   * Warning:
-//       How to create D-CODE: https://github.com/0xDC00/agent/wiki/Finding-D-CODE
+//       D-CODE wiki: https://github.com/0xDC00/agent/wiki/Finding-D-CODE
 //       D-CODE database: https://docs.google.com/spreadsheets/d/14k5TBc2cAed8Fcx2fb5schlPh6Ah24dmW3dJpxvNAbc/
 // ==/UserScript==
 (function () {
     console.log('Script loaded!');
-    //const _FIXED_DCODE_ = ''; // <-- SPECIFIC GAME SETTING
-
     while (Process.isDebuggerAttached()) prompt('Please exit the debugger!');
 
     _main_();
 
-    // String block may contain controls code, that will need a custom parser.
-    function filters_text(s) {
+    function filters_text(s) { // String block may contain controls code, that will need a custom parser.
         return s
             /* filter1: controls -> \n */
             .replace(/[\u0000-\u001F\u007F-\u009F\xFFFD]/g, '\n')
@@ -33,6 +30,7 @@
             ;
     }
 
+    var previousString; // only submit new string
     function read_text(info) {
         const address = info.address;
         console.log(hexdump(address, { header: false }));
@@ -50,14 +48,17 @@
                         const buf = address.readByteArray(len);
                         const str = filters_text(info.decoder.decode(buf));
                         if (str) {
-                            console.log('buf\n', hexdump(buf, { header: false }));
-                            trans.send(str); // send to translation aggregator
+                            if (str !== previousString) {
+                                console.log('buf\n', hexdump(buf, { header: false }));
+                                previousString = str;
+                                trans.send(str); // send to translation aggregator
+                            }
+                            else console.log('>');
                         }
                     }
-
                     return 'stop';
                 },
-                onComplete: function () { info.address = null; }
+                onComplete: function () { if (!info.debounce) info.address = null; }
             });
         }
     }
@@ -67,9 +68,6 @@
     }
 
     function _main_() {
-        globalThis.readDelay = 750;
-        globalThis.isLeading = false;
-
         if (typeof globalThis.filters === 'function') {
             globalThis._filters = filters_text;
             filters_text = filters;
@@ -87,7 +85,7 @@
             var count = 0;
             for (const code of codes) {
                 if (code[0] == '$') {
-                    if (execDCode(code) && ++count == 4) break;
+                    if (loadDcode(code) && ++count == 4) break;
                 }
             }
             return;
@@ -98,7 +96,7 @@
 
         input = input.trim();
         if (input[0] == '$') {
-            if (!execDCode(input)) return _main_();
+            if (!loadDcode(input)) return _main_();
         } // TODO: support H-Code
         else { // ask user
             if (!parseInt(input)) _main_();
@@ -106,49 +104,50 @@
                 var encoding = prompt('Encoding?\n1. utf-8\n2. utf-16le\n3. utf-32le\n4. shift_jis', 'utf-8');
                 encoding = getEncodingName(encoding);
 
-                var terminated_pattern = encoding.toUpperCase().startsWith('UTF-32') ? '00 00 00 0?' : '00 0?';
+                var terminated_pattern = encoding.toUpperCase().startsWith('UTF-32') ? '00 00 00 00' : '00 00';
                 var terminated = prompt('terminated pattern?\n- 00\n- 00 0?\n- 00 00 00 0?', terminated_pattern);
                 if (terminated) terminated_pattern = terminated;
                 terminated_pattern = terminated_pattern.replace(/\s/g, ''); // all whitespace, not just the literal space
 
                 var dcode = '$' + encoding + ',' + terminated_pattern + ',' + input;
-                execDCode(dcode);
+                loadDcode(dcode);
             }
         }
     }
 
-    function execDCode(sdcode) {
+    function loadDcode(sdcode) {
         console.log('Load: ' + sdcode);
         const dcode = {
-            readDelay: readDelay,
-            isLeading: isLeading
+            readDelay: 750
         };
         var splited = sdcode.substr(1).split(','); // Decode,Read,Hook
 
         /* parse Decode: encoding */
         dcode.decoder = new TextDecoder(splited[0]);
 
-        /* parse Read: ?padding_1248|?delay|?isLeading|terminatedPattern */
+        /* parse Read: ?padding_1248|?debounceOption|terminatedPattern */
         dcode.bufferSize = 4096;
         dcode.terminated = splited[1].replace(/\s/g, '');
         var termSplited = dcode.terminated.split('|');
         if (termSplited.length > 1) {
             dcode.terminated = termSplited[termSplited.length - 1]; // last
 
-            // padding can be empty: |?delay|terminated
+            // padding can be empty: |?debounceOption|terminated
             dcode.padding = termSplited[0] ? parseInt(termSplited[0]) : dcode.terminated.length / 2;
 
-            // delay can be empty:   ||terminated
-            if (termSplited.length > 2) {
-                if (termSplited[1]) dcode.readDelay = parseInt(termSplited[1]);
+            // debounceOption can be empty:   ||terminated
+            if (termSplited[1]) {
+                const timeout = termSplited[1].match(/\d+$/g);
+                if (timeout) dcode.readDelay = parseInt(timeout[0]);
 
-                dcode.isLeading = termSplited[2] === '1';
+                const debounce = termSplited[1].match(/^\D+/g);
+                if (debounce) dcode.debounce = debounce[0];
             }
         }
         else {
             dcode.padding = dcode.terminated.length / 2; // default: byteCount
         }
-        if (dcode.terminated[0] == '*') {
+        if (dcode.terminated[0] === '*') {
             const s = dcode.terminated.substr(1);
             if (s) dcode.bufferSize = parseInt(s);
             dcode.terminated = undefined;
@@ -212,8 +211,9 @@
 
     // debounce trailing (run after last execute): https://miro.medium.com/max/1400/1*-r8hP_iDBPrj-odjIZajzw.gif
     function createDebounceCallback(func, info, getMemoryAddress) {
-        const timeout = info.readDelay;
         let timer = null;
+        const timeout = info.readDelay;
+        const dbMode = info.debounce;
         info.address = null;
         info.buffer = null;
 
@@ -224,36 +224,63 @@
             func.call(this, info);
         }
 
-        if (info.isLeading) { // debounce leading
-            return function () {
-                console.log('onEnter', getMemoryAddress(this.context));
-                if (!timer) {
-                    runSync.call(this);
-                }
-
-                clearTimeout(timer);
-                timer = setTimeout(function () { timer = undefined; console.log('>>>'); }, timeout);
-            };
-        }
-
-        if (timeout == 0) { // runSync when noDelay
+        if (timeout === 0) { // runSync when noDelay
             return function () {
                 console.log('onEnter', getMemoryAddress(this.context));
                 runSync.call(this);
             };
         }
-
-        return function () {
-            console.log('onEnter', getMemoryAddress(this.context));
-            if (info.address == null) {
-                // fist time <=> begin of line
-                // Problem: fast next => first line!
+        else if (dbMode === 'lt' || dbMode === 'lT') { // debounce leading (sync) & trailing (sync ? CALLBACK)
+            let count = 0;
+            const isSync = dbMode === 'lt';
+            return function () {
+                count++;
                 info.address = getMemoryAddress(this.context);
-            }
+                console.log('onEnter', info.address);
+                if (!timer) runSync.call(this);
+                else if (isSync) {
+                    info.buffer = info.address.readByteArray(info.bufferSize);
+                    info.address = info.buffer.unwrap();
+                }
+                
+                clearTimeout(timer);
+                timer = setTimeout(function () { timer = undefined; if (count > 1) func.call(this, info); count = 0; }, timeout);
+            };
+        }
+        else if (dbMode === 'l') {// debounce leading (sync)
+            return function () {
+                console.log('onEnter', getMemoryAddress(this.context));
+                if (!timer) runSync.call(this);
 
-            clearTimeout(timer);
-            timer = setTimeout(func, timeout, info);
-        };
+                clearTimeout(timer);
+                timer = setTimeout(function () { timer = undefined; console.log('>>>'); }, timeout);
+            };
+        }
+        else if (dbMode === 't' || dbMode === 'T') { // debounce trailing (sync ? CALLBACK)
+            const isSync = dbMode === 't';
+            return function () {
+                info.address = getMemoryAddress(this.context);
+                console.log('onEnter', info.address);
+                if (isSync) {
+                    info.buffer = info.address.readByteArray(info.bufferSize);
+                    info.address = info.buffer.unwrap();
+                }
+                clearTimeout(timer);
+                timer = setTimeout(func, timeout, info);
+            };
+        }
+        else {
+            // default: trailing first (callback)
+            // fist time <=> begin of line (Problem: fast next => first line!)
+            info.debounce = undefined;
+            return function () {
+                console.log('onEnter', getMemoryAddress(this.context));
+                if (info.address == null) info.address = getMemoryAddress(this.context);
+
+                clearTimeout(timer);
+                timer = setTimeout(func, timeout, info);
+            };
+        }
     }
 
     function exec_watch(dcode) {
@@ -264,7 +291,7 @@
         console.log('getMemoryAddress: ', getMemoryAddress);
 
         // set breakpoint on excute (x) at insAddress, all threads (-1).
-        // KnowIssue: live reload, re-set hwbp = random crash (Interceptor.attach work but freeze when reload)
+        // KnowIssue: live reload, re-set hwbp = random crash (Interceptor.attach work but freeze when reload, +-2GB limit)
         const bp = hwbp.add(insAddress, 'x', 1, callback, -1);
         console.log(bp ? `HWBP at ${insAddress} set!` : '[Error] HWBP.add');
         return bp ? true : false;
@@ -467,10 +494,3 @@
         return parse;
     }
 })();
-
-/*
-Refs:
-https://gist.github.com/ryanmcgrath/982242
-  https://stackoverflow.com/questions/15033196/using-javascript-to-check-whether-a-string-contains-japanese-characters-includi/15034560
-https://stackoverflow.com/questions/28256/equation-expression-parser-with-precedence
-*/
