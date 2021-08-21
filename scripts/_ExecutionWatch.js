@@ -31,36 +31,50 @@
     }
 
     var previousString; // only submit new string
-    function read_text(info) {
-        const address = info.address;
+    function submitTranslate(dcode, buf) {
+        const str = filters_text(dcode.decoder.decode(buf));
+        if (str) {
+            if (str !== previousString) {
+                console.log('|\n' + hexdump(dcode.address, { header: false, length: buf.byteLength }));
+                previousString = str;
+                trans.send(str); // send to translation aggregator
+            }
+            else console.log('>');
+        }
+    }
+    
+    function read_text(dcode) {
+        const address = dcode.address;
         console.log(hexdump(address, { header: false }));
 
-        if (!info.terminated) { // fixed-size buffers
-            const buf = info.buffer ? info.buffer : address.readByteArray(info.bufferSize);
-            const str = filters_text(info.decoder.decode(buf));
-            if (str) trans.send(str);
+        if (!dcode.terminated) { // fixed-size buffers
+            const buf = dcode.buffer ? dcode.buffer : address.readByteArray(dcode.bufferSize); // ?snapshot
+            submitTranslate(dcode, buf);
         }
         else { // detect block size with terminated_pattern
-            Memory.scan(address, info.bufferSize, info.terminated, {
-                onMatch: function (found, size) {
-                    const len = align(found.sub(address).toInt32(), info.padding);
+            dcode._scan.call(dcode, address, dcode.bufferSize, dcode.terminated, {
+                onMatch: function (found, _) {
+                    const len = align(found.sub(address).toInt32(), dcode.padding);
                     if (len > 0) {
-                        const buf = address.readByteArray(len);
-                        const str = filters_text(info.decoder.decode(buf));
-                        if (str) {
-                            if (str !== previousString) {
-                                console.log('buf\n', hexdump(buf, { header: false }));
-                                previousString = str;
-                                trans.send(str); // send to translation aggregator
-                            }
-                            else console.log('>');
-                        }
+                        const buf = address.readByteArray(len); // ArrayBuffer.wrap = random CRASH
+                        submitTranslate(dcode, buf);
                     }
                     return 'stop';
                 },
-                onComplete: function () { if (!info.debounce) info.address = null; }
+                onComplete: function () { if (!dcode.debounce) dcode.address = null; } // reset first-address
             });
         }
+    }
+
+    function alignScan(address, size, _, o) {
+        const view = new DataView(address.readByteArray(size));
+        for (let i=0; i<size; i+=this.align) {
+            const t = view[this.fnRead](i, true);
+            if (t === this.needle) {
+                if (o.onMatch(address.add(i), this.align) === 'stop') break;
+            }
+        }
+        o.onComplete();
     }
 
     function align(value, alignment) { // 1 2 4 8 16
@@ -147,10 +161,24 @@
         else {
             dcode.padding = dcode.terminated.length / 2; // default: byteCount
         }
-        if (dcode.terminated[0] === '*') {
+        if (dcode.terminated[0] === '*') { // *SIZE
             const s = dcode.terminated.substr(1);
             if (s) dcode.bufferSize = parseInt(s);
             dcode.terminated = undefined;
+        }
+        else { //  prefer alignScan
+            dcode._scan = Memory.scan;
+            if (!dcode.terminated.includes('?') && dcode.padding > 1) {
+                const align = dcode.terminated.length / 2;
+                if (align === 2) dcode.fnRead = 'getUint16';
+                else if (align === 4) dcode.fnRead = 'getUint32';
+                if (dcode.fnRead) {
+                    dcode._scan = alignScan;
+                    dcode.align = align;
+                    dcode.needle = parseInt(dcode.terminated.match(/../g).reverse().join(''), 16);
+                }
+            }
+            dcode.padding = Math.abs(dcode.padding);
         }
 
         /* parse Hook: ?offset|?expressions|movHookPattern */
@@ -210,18 +238,18 @@
     }
 
     // debounce trailing (run after last execute): https://miro.medium.com/max/1400/1*-r8hP_iDBPrj-odjIZajzw.gif
-    function createDebounceCallback(func, info, getMemoryAddress) {
+    function createDebounceCallback(func, dcode, getMemoryAddress) {
         let timer = null;
-        const timeout = info.readDelay;
-        const dbMode = info.debounce;
-        info.address = null;
-        info.buffer = null;
+        const timeout = dcode.readDelay;
+        const dbMode = dcode.debounce;
+        dcode.address = null;
+        dcode.buffer = null;
 
         function runSync() {
-            info.address = getMemoryAddress(this.context);
-            info.buffer = info.address.readByteArray(info.bufferSize);
-            info.address = info.buffer.unwrap();
-            func.call(this, info);
+            dcode.address = getMemoryAddress(this.context);
+            dcode.buffer = dcode.address.readByteArray(dcode.bufferSize);
+            dcode.address = dcode.buffer.unwrap();
+            func.call(this, dcode);
         }
 
         if (timeout === 0) { // runSync when noDelay
@@ -235,16 +263,16 @@
             const isSync = dbMode === 'lt';
             return function () {
                 count++;
-                info.address = getMemoryAddress(this.context);
-                console.log('onEnter', info.address);
+                dcode.address = getMemoryAddress(this.context);
+                console.log('onEnter', dcode.address);
                 if (!timer) runSync.call(this);
                 else if (isSync) {
-                    info.buffer = info.address.readByteArray(info.bufferSize);
-                    info.address = info.buffer.unwrap();
+                    dcode.buffer = dcode.address.readByteArray(dcode.bufferSize);
+                    dcode.address = dcode.buffer.unwrap();
                 }
                 
                 clearTimeout(timer);
-                timer = setTimeout(function () { timer = undefined; if (count > 1) func.call(this, info); count = 0; }, timeout);
+                timer = setTimeout(function () { timer = undefined; if (count > 1) func.call(this, dcode); count = 0; }, timeout);
             };
         }
         else if (dbMode === 'l') {// debounce leading (sync)
@@ -259,26 +287,26 @@
         else if (dbMode === 't' || dbMode === 'T') { // debounce trailing (sync ? CALLBACK)
             const isSync = dbMode === 't';
             return function () {
-                info.address = getMemoryAddress(this.context);
-                console.log('onEnter', info.address);
+                dcode.address = getMemoryAddress(this.context);
+                console.log('onEnter', dcode.address);
                 if (isSync) {
-                    info.buffer = info.address.readByteArray(info.bufferSize);
-                    info.address = info.buffer.unwrap();
+                    dcode.buffer = dcode.address.readByteArray(dcode.bufferSize);
+                    dcode.address = dcode.buffer.unwrap();
                 }
                 clearTimeout(timer);
-                timer = setTimeout(func, timeout, info);
+                timer = setTimeout(func, timeout, dcode);
             };
         }
         else {
             // default: trailing first (callback)
             // fist time <=> begin of line (Problem: fast next => first line!)
-            info.debounce = undefined;
+            dcode.debounce = undefined;
             return function () {
                 console.log('onEnter', getMemoryAddress(this.context));
-                if (info.address == null) info.address = getMemoryAddress(this.context);
+                if (dcode.address == null) dcode.address = getMemoryAddress(this.context);
 
                 clearTimeout(timer);
-                timer = setTimeout(func, timeout, info);
+                timer = setTimeout(func, timeout, dcode);
             };
         }
     }
