@@ -12,7 +12,8 @@
 (function () {
     console.log('Script loaded!');
     while (Process.isDebuggerAttached()) prompt('Please exit the debugger!');
-
+    Patch_OutputDebugString();
+    
     _main_();
 
     function filters_text(s) { // String block may contain controls code, that will need a custom parser.
@@ -26,7 +27,7 @@
             /* filter4: remove trailing \n */
             .replace(/\n+$/, '')
             /* filter5: single line */
-            //.replace(/\n+/, ' ')
+            //.replace(/\n+/g, ' ')
             ;
     }
 
@@ -238,18 +239,22 @@
     }
 
     // debounce trailing (run after last execute): https://miro.medium.com/max/1400/1*-r8hP_iDBPrj-odjIZajzw.gif
-    function createDebounceCallback(func, dcode, getMemoryAddress) {
+    function createDebounceCallback(fnReadText, dcode, getMemoryAddress) {
         let timer = null;
         const timeout = dcode.readDelay;
         const dbMode = dcode.debounce;
         dcode.address = null;
         dcode.buffer = null;
 
+        if (typeof globalThis[dbMode] === 'function' && dbMode.startsWith('$_')) {
+            return globalThis[dbMode].call(this, fnReadText, dcode, getMemoryAddress);
+        }
+
         function runSync() {
             dcode.address = getMemoryAddress(this.context);
             dcode.buffer = dcode.address.readByteArray(dcode.bufferSize);
             dcode.address = dcode.buffer.unwrap();
-            func.call(this, dcode);
+            fnReadText.call(this, dcode);
         }
 
         if (timeout === 0) { // runSync when noDelay
@@ -272,7 +277,7 @@
                 }
                 
                 clearTimeout(timer);
-                timer = setTimeout(function () { timer = undefined; if (count > 1) func.call(this, dcode); count = 0; }, timeout);
+                timer = setTimeout(function () { timer = undefined; if (count > 1) fnReadText.call(this, dcode); count = 0; }, timeout);
             };
         }
         else if (dbMode === 'l') {// debounce leading (sync)
@@ -294,7 +299,7 @@
                     dcode.address = dcode.buffer.unwrap();
                 }
                 clearTimeout(timer);
-                timer = setTimeout(func, timeout, dcode);
+                timer = setTimeout(fnReadText, timeout, dcode);
             };
         }
         else {
@@ -306,7 +311,7 @@
                 if (dcode.address == null) dcode.address = getMemoryAddress(this.context);
 
                 clearTimeout(timer);
-                timer = setTimeout(func, timeout, dcode);
+                timer = setTimeout(fnReadText, timeout, dcode);
             };
         }
     }
@@ -520,5 +525,18 @@
             }
         }
         return parse;
+    }
+
+    function Patch_OutputDebugString() {
+        const pKernel32_OutputDebugStringW = Module.findExportByName('kernel32', 'OutputDebugStringW');
+        if (pKernel32_OutputDebugStringW) {
+            Memory.protect(pKernel32_OutputDebugStringW, Process.pageSize, 'rwx');
+            pKernel32_OutputDebugStringW.writeU8(0xC3); // RET
+        }
+        const pOutputDebugStringW = Module.findExportByName('kernelbase', 'OutputDebugStringW');
+        if (pOutputDebugStringW) {
+            Memory.protect(pOutputDebugStringW, Process.pageSize, 'rwx');
+            pOutputDebugStringW.writeU8(0xC3); // RET
+        }
     }
 })();
