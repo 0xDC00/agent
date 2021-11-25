@@ -1,50 +1,45 @@
 # Agent
-Text hooker with javascript.
+~~Text~~ hooker with javascript.
 
 ## Features
 - Based on script.
 - Hook everything.
 
-## Project Architecture
-- The program (GUI) injects javascript and runtime into the target process.
-- The script will "hook" to the correspond memory address to get the text in-game
-then sent them to the translator (eg: translation aggregator, chiitrans, textractor,...)
-- That alls.
-
 ### Folder Structure
 ```
-Agent.exe               <-- GUI
-+scripts                <-- user scripts
--bin
- ├─agent-32.bin         <-- runtime
- ├─agent-64.bin
- ├─agent-helper-32.bin  <-- injector
- ├─agent-helper-64.bin
- ├─init.js              <-- global script
- └─log_console          <-- log channel, based on file name.
+agent.exe               <-- GUI
+-data
+  ├─scripts             <-- user scripts
+  └─user-data           <-- Electron cache
+-...
 ```
 
 ## Download
-Latest: <https://github.com/0xDC00/agent/archive/refs/heads/master.zip>
+Latest: <https://github.com/0xDC00/agent/releases>
 
 ## Usage
-- Select game from path or pick a running process (drag right-click from the first three-dots button).
-- Select script.
+- Pick a running process.
+- Select a script.
 - Press Attach button.
 
-## Showcase & Tutorials (PC, Emulator: PPSSPP, Vita3k, Yuzu, ...)
-- Wiki: https://github.com/0xDC00/agent/wiki
-- ExecutionWatch\
-  [![Tantei Bokumetsu](https://img.youtube.com/vi/bFuD9Fb1zKM/1.jpg)](https://youtu.be/bFuD9Fb1zKM?list=PLTZXVVG9AT6TATy_7ey3jUkE0g35t3xtk)
+## Tutorials
+- Example script: [https://github.com/0xDC00/scripts](https://github.com/0xDC00/scripts)
+- [Yuzu] Tsukihime\
+  [![Tsukihime Remake](https://img.youtube.com/vi/SD_nO59p0mk/1.jpg)](https://youtu.be/SD_nO59p0mk)
 
 ## Community
 If you have contributions, need support, have suggestions,\
 or just want to get in touch with the team, join our [Discord server](https://discord.gg/cdmSkXR7j8)!
 
-
 ## Credits
-- [Gum](https://github.com/frida/frida-gum)
-- [AvalonEdit](https://github.com/icsharpcode/AvalonEdit)
+- [Frida](https://github.com/frida/frida)
+- [Electron](https://github.com/electron/electron)
 
-## TODO
-- ?
+## Special Thanks
+- People I forgot to add to this list.
+- [oleavr](https://github.com/oleavr)
+- [sunho](https://github.com/sunho)
+- [Reishiki](https://www.facebook.com/otomevn)
+- [Oblivion](https://discord.com/invite/YE59VVK)
+
+Thank you!
