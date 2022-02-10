@@ -26,7 +26,7 @@ Link: [https://www.youtube.com/watch?v=c0aVSr_nYJ0&list=PLTZXVVG9AT6Sbl1Yg42sxzV
 
 ## Community
 If you have contributions, need support, have suggestions,\
-or just want to get in touch with the team, join our [Discord server](https://discord.gg/cdmSkXR7j8)!\
+or just want to get in touch with the team, join our [Discord server](https://discord.gg/cdmSkXR7j8)!
 
 Script request?, please create an issue here: [https://github.com/0xDC00/scripts](https://github.com/0xDC00/scripts)
 
