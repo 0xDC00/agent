@@ -17,19 +17,18 @@ agent.exe               <-- GUI
 ## Download
 Latest: <https://github.com/0xDC00/agent/releases>
 
-## Usage
-- Pick a running process.
-- Select a script.
-- Press Attach button.
+## Quickstart
+Link: [https://www.youtube.com/watch?v=c0aVSr_nYJ0&list=PLTZXVVG9AT6Sbl1Yg42sxzVAS6IMfnaNH](https://www.youtube.com/watch?v=c0aVSr_nYJ0&list=PLTZXVVG9AT6Sbl1Yg42sxzVAS6IMfnaNH)
 
-## Tutorials
-- Example script: [https://github.com/0xDC00/scripts](https://github.com/0xDC00/scripts)
+## Showcase
 - [Yuzu] Tsukihime\
   [![Tsukihime Remake](https://img.youtube.com/vi/SD_nO59p0mk/1.jpg)](https://youtu.be/SD_nO59p0mk)
 
 ## Community
 If you have contributions, need support, have suggestions,\
-or just want to get in touch with the team, join our [Discord server](https://discord.gg/cdmSkXR7j8)!
+or just want to get in touch with the team, join our [Discord server](https://discord.gg/cdmSkXR7j8)!\
+
+Script request?, please create an issue here: [https://github.com/0xDC00/scripts](https://github.com/0xDC00/scripts)
 
 ## Credits
 - [Frida](https://github.com/frida/frida)
