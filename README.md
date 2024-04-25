@@ -11,7 +11,7 @@
 
 ## Quickstart
 Download: <https://github.com/0xDC00/agent/releases>\
-Videos: [https://www.youtube.com/watch?v=c0aVSr_nYJ0&list=PLTZXVVG9AT6Sbl1Yg42sxzVAS6IMfnaNH](https://www.youtube.com/watch?v=c0aVSr_nYJ0&list=PLTZXVVG9AT6Sbl1Yg42sxzVAS6IMfnaNH)
+Videos: [https://www.youtube.com/watch?v=dFfuq2UnKjU&list=PLTZXVVG9AT6Sbl1Yg42sxzVAS6IMfnaNH&index=2](https://www.youtube.com/watch?v=dFfuq2UnKjU&list=PLTZXVVG9AT6Sbl1Yg42sxzVAS6IMfnaNH&index=2)
 #### Folder Structure
 ```
 agent.exe               <-- GUI
@@ -22,7 +22,7 @@ agent.exe               <-- GUI
 
 ## Community
 If you have contributions, need support, have suggestions,\
-or just want to get in touch with the team, join our [Discord server](https://discord.gg/cdmSkXR7j8)!
+or just want to get in touch with the team, join our [Discord server](https://discord.gg/sWeFsmJYJc)!
 
 Script request?, please open an issue at [scripts repo](https://github.com/0xDC00/scripts/issues)
 
